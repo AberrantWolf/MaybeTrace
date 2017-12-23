@@ -1,0 +1,6 @@
+[package]
+name = "maybe_trace"
+version = "0.1.0"
+authors = ["Scott Harper <orcein@gmail.com>"]
+
+[dependencies]
