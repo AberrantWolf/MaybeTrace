@@ -1,4 +1,5 @@
 use std::ops;
+use std::f32;
 
 #[derive(Copy, Clone)]
 struct Vec3D {x:f32, y:f32, z:f32}
@@ -7,7 +8,7 @@ impl Vec3D {
         Vec3D { x: ix, y: iy, z: iz }
     }
 
-    fn dot(self, other: Vec3D) -> f32 {
+    fn dot(&self, other: Vec3D) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
@@ -141,7 +142,7 @@ impl Ray {
         Ray {origin:orig, direction:dir}
     }
 
-    fn point_at_dist(self, dist:f32) -> Vec3D {
+    fn point_at_dist(&self, dist:f32) -> Vec3D {
         self.origin + self.direction * dist
     }
 }
@@ -179,35 +180,93 @@ struct HitRecord {
     p:Vec3D,
     normal:Vec3D,
 }
-trait Hitable {
-    fn hit(ray:&Ray, t_min:f32, t_max:f32, hit_record:&mut HitRecord) -> bool;
+impl HitRecord {
+    fn new() -> HitRecord {
+        HitRecord {
+            t: 0.0,
+            p: Vec3D { x: 0.0, y: 0.0, z: 0.0 },
+            normal: Vec3D { x: 0.0, y: 0.0, z: 0.0 },
+        }
+    }
 }
 
-// TODO: create Sphere class and implement Hitable on it
+trait Hitable {
+    fn hit(&self, ray:&Ray, t_min:f32, t_max:f32, hit_record:&mut HitRecord) -> bool;
+}
+
 struct Sphere {
     center:Vec3D,
     radius:f32,
 }
-
-fn hit_sphere(center:Vec3D, radius:f32, ray:&Ray) -> f32 {
-    let oc = ray.origin - center;
-    let a = ray.direction.dot(ray.direction);
-    let b = 2.0 * oc.dot(ray.direction);
-    let c = oc.dot(oc) - radius * radius;
-    let descriminant = b*b - 4.0*a*c;
-    if descriminant < 0.0 {
-        return -1.0;
+impl Sphere {
+    fn new(ctr:Vec3D, rad:f32) -> Sphere {
+        Sphere {center:ctr, radius:rad}
     }
-
-    (-b - descriminant.sqrt()) / (2.0 * a)
 }
 
-fn color(ray:Ray) -> Vec3D {
-    let t = hit_sphere(Vec3D::new(0.0, 0.0, -1.0), 0.5, &ray);
+impl Hitable for Sphere {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, hit_record: &mut HitRecord) -> bool {
+        let oc = ray.origin - self.center;
+        let a = ray.direction.dot(ray.direction);
+        let b = oc.dot(ray.direction);
+        let c = oc.dot(oc) - self.radius * self.radius;
 
-    if t > 0.0 {
-        let n = (ray.point_at_dist(t) - Vec3D::new(0.0, 0.0, -1.0)).as_unit();
-        return 0.5 * Vec3D::new(n.x + 1.0, n.y + 1.0, n.z + 1.0);
+        let descriminant = b*b - a*c;
+        if descriminant > 0.0 {
+            let t_neg = (-b - descriminant.sqrt()) / a;
+            let t_pos = (-b + descriminant.sqrt()) / a;
+
+            if t_neg < t_max && t_neg > t_min {
+                hit_record.t = t_neg;
+                hit_record.p = ray.point_at_dist(hit_record.t);
+                hit_record.normal = (hit_record.p - self.center) / self.radius;
+                return true
+            }
+            else if t_pos < t_max && t_pos > t_min {
+                hit_record.t = t_pos;
+                hit_record.p = ray.point_at_dist(hit_record.t);
+                hit_record.normal = (hit_record.p - self.center) / self.radius;
+                return true
+            }
+        }
+        return false
+    }
+}
+
+struct HitableList {
+    list:Vec<Box<Hitable>>,
+}
+
+impl HitableList {
+    fn new() -> HitableList {
+        HitableList {
+            list: Vec::new(),
+        }
+    }
+}
+
+impl Hitable for HitableList {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, hit_record: &mut HitRecord) -> bool {
+        let mut hit_anything = false;
+        let mut closest_so_far = t_max;
+
+        for h in &self.list {
+            let mut temp_record = HitRecord::new();
+            if h.hit(ray, t_min, closest_so_far, &mut temp_record) {
+                hit_anything = true;
+                closest_so_far = temp_record.t;
+                *hit_record = temp_record;
+            }
+        }
+
+        return hit_anything;
+    }
+}
+
+fn color(ray:Ray, world:&Hitable) -> Vec3D {
+    let mut rec = HitRecord::new();
+    if world.hit(&ray, 0.0, f32::MAX, &mut rec) {
+        return 0.5 * Vec3D::new(rec.normal.x + 1.0, rec.normal.y + 1.0, rec.normal.z + 1.0);
     }
 
     let unit_dir:Vec3D = ray.direction.as_unit();
@@ -223,6 +282,10 @@ fn main() {
     let vertical = Vec3D::new(0.0, 2.0, 0.0);
     let origin = Vec3D::new(0.0, 0.0, 0.0);
 
+    let mut world = HitableList::new();
+    world.list.push(Box::new(Sphere::new(Vec3D::new(0.0, 0.0, -1.0), 0.5)));
+    world.list.push(Box::new(Sphere::new(Vec3D::new(0.0, -100.5, -1.0), 100.0)));
+
     println!("P3");
     println!("{0} {1}", img.dims.x, img.dims.y);
     println!("255");
@@ -232,7 +295,7 @@ fn main() {
             let v = 1f32 - y as f32 / img.dims.y as f32;
 
             let r = Ray::new(origin, lower_left_corner + u*horizontal + v*vertical);
-            let c = color(r);
+            let c = color(r, &world);
 
             println!("{0} {1} {2}",
                      (c.x * 255.99) as i32,
