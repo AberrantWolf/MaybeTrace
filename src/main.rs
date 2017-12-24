@@ -1,18 +1,18 @@
 use std::ops;
 
 #[derive(Copy, Clone)]
-struct v3f {x:f32, y:f32, z:f32}
-impl v3f {
-    fn new(ix: f32, iy: f32, iz: f32) -> v3f {
-        v3f { x: ix, y: iy, z: iz }
+struct Vec3D {x:f32, y:f32, z:f32}
+impl Vec3D {
+    fn new(ix: f32, iy: f32, iz: f32) -> Vec3D {
+        Vec3D { x: ix, y: iy, z: iz }
     }
 
-    fn dot(self, other: v3f) -> f32 {
+    fn dot(self, other: Vec3D) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
-    fn cross(&self, other: v3f) -> v3f {
-        v3f {
+    fn cross(&self, other: Vec3D) -> Vec3D {
+        Vec3D {
             x: self.y * other.z - self.z * other.y,
             y: -self.x * other.z - self.z * other.x,
             z: self.x * other.y - self.y * other.x
@@ -27,9 +27,9 @@ impl v3f {
         self.squared_length().sqrt()
     }
 
-    fn as_unit(&self) -> v3f {
+    fn as_unit(&self) -> Vec3D {
         let mag = self.length();
-        v3f {
+        Vec3D {
             x: self.x / mag,
             y: self.y / mag,
             z: self.z / mag
@@ -44,11 +44,11 @@ impl v3f {
     }
 }
 
-impl ops::Add<v3f> for v3f {
-    type Output = v3f;
+impl ops::Add<Vec3D> for Vec3D {
+    type Output = Vec3D;
 
-    fn add(self, _rhs: v3f) -> v3f {
-        v3f {
+    fn add(self, _rhs: Vec3D) -> Vec3D {
+        Vec3D {
             x: self.x + _rhs.x,
             y: self.y + _rhs.y,
             z: self.z + _rhs.z
@@ -56,11 +56,11 @@ impl ops::Add<v3f> for v3f {
     }
 }
 
-impl ops::Sub<v3f> for v3f {
-    type Output = v3f;
+impl ops::Sub<Vec3D> for Vec3D {
+    type Output = Vec3D;
 
-    fn sub(self, _rhs: v3f) -> v3f {
-        v3f {
+    fn sub(self, _rhs: Vec3D) -> Vec3D {
+        Vec3D {
             x: self.x - _rhs.x,
             y: self.y - _rhs.y,
             z: self.z - _rhs.z,
@@ -68,11 +68,11 @@ impl ops::Sub<v3f> for v3f {
     }
 }
 
-impl ops::Mul<v3f> for v3f {
-    type Output = v3f;
+impl ops::Mul<Vec3D> for Vec3D {
+    type Output = Vec3D;
 
-    fn mul(self, _rhs: v3f) -> v3f {
-        v3f {
+    fn mul(self, _rhs: Vec3D) -> Vec3D {
+        Vec3D {
             x: self.x * _rhs.x,
             y: self.y * _rhs.y,
             z: self.z * _rhs.z,
@@ -80,11 +80,11 @@ impl ops::Mul<v3f> for v3f {
     }
 }
 
-impl ops::Div<v3f> for v3f {
-    type Output = v3f;
+impl ops::Div<Vec3D> for Vec3D {
+    type Output = Vec3D;
 
-    fn div(self, _rhs: v3f) -> v3f {
-        v3f {
+    fn div(self, _rhs: Vec3D) -> Vec3D {
+        Vec3D {
             x: self.x / _rhs.x,
             y: self.y / _rhs.y,
             z: self.z / _rhs.z,
@@ -92,11 +92,11 @@ impl ops::Div<v3f> for v3f {
     }
 }
 
-impl ops::Mul<f32> for v3f {
-    type Output = v3f;
+impl ops::Mul<f32> for Vec3D {
+    type Output = Vec3D;
 
-    fn mul(self, _rhs: f32) -> v3f {
-        v3f {
+    fn mul(self, _rhs: f32) -> Vec3D {
+        Vec3D {
             x: self.x * _rhs,
             y: self.y * _rhs,
             z: self.z * _rhs,
@@ -104,11 +104,11 @@ impl ops::Mul<f32> for v3f {
     }
 }
 
-impl ops::Div<f32> for v3f {
-    type Output = v3f;
+impl ops::Div<f32> for Vec3D {
+    type Output = Vec3D;
 
-    fn div(self, _rhs: f32) -> v3f {
-        v3f {
+    fn div(self, _rhs: f32) -> Vec3D {
+        Vec3D {
             x: self.x / _rhs,
             y: self.y / _rhs,
             z: self.z / _rhs,
@@ -116,32 +116,32 @@ impl ops::Div<f32> for v3f {
     }
 }
 
-impl ops::Mul<v3f> for f32 {
-    type Output = v3f;
+impl ops::Mul<Vec3D> for f32 {
+    type Output = Vec3D;
 
-    fn mul(self, _rhs: v3f) -> v3f {
+    fn mul(self, _rhs: Vec3D) -> Vec3D {
         _rhs * self
     }
 }
 
-impl ops::Div<v3f> for f32 {
-    type Output = v3f;
+impl ops::Div<Vec3D> for f32 {
+    type Output = Vec3D;
 
-    fn div(self, _rhs: v3f) -> v3f {
+    fn div(self, _rhs: Vec3D) -> Vec3D {
         _rhs * self
     }
 }
 
 struct Ray {
-    origin: v3f,
-    direction: v3f,
+    origin: Vec3D,
+    direction: Vec3D,
 }
 impl Ray {
-    fn new(orig: v3f, dir: v3f) -> Ray {
+    fn new(orig: Vec3D, dir: Vec3D) -> Ray {
         Ray {origin:orig, direction:dir}
     }
 
-    fn point_at_dist(self, dist:f32) -> v3f {
+    fn point_at_dist(self, dist:f32) -> Vec3D {
         self.origin + self.direction * dist
     }
 }
@@ -150,7 +150,7 @@ struct Dimension {x:usize, y:usize}
 
 struct Image {
     dims: Dimension,
-    data: Vec<v3f>,
+    data: Vec<Vec3D>,
 }
 
 impl Image {
@@ -162,7 +162,7 @@ impl Image {
 
         for _y in 0..result.dims.y {
             for _x in 0..result.dims.x {
-                result.data.push(v3f{
+                result.data.push(Vec3D{
                     x: 0f32,
                     y: 0f32,
                     z: 0f32,
@@ -176,16 +176,20 @@ impl Image {
 
 struct HitRecord {
     t:f32,
-    p:v3f,
-    normal:v3f,
+    p:Vec3D,
+    normal:Vec3D,
 }
 trait Hitable {
     fn hit(ray:&Ray, t_min:f32, t_max:f32, hit_record:&mut HitRecord) -> bool;
 }
 
 // TODO: create Sphere class and implement Hitable on it
+struct Sphere {
+    center:Vec3D,
+    radius:f32,
+}
 
-fn hit_sphere(center:v3f, radius:f32, ray:&Ray) -> f32 {
+fn hit_sphere(center:Vec3D, radius:f32, ray:&Ray) -> f32 {
     let oc = ray.origin - center;
     let a = ray.direction.dot(ray.direction);
     let b = 2.0 * oc.dot(ray.direction);
@@ -198,26 +202,26 @@ fn hit_sphere(center:v3f, radius:f32, ray:&Ray) -> f32 {
     (-b - descriminant.sqrt()) / (2.0 * a)
 }
 
-fn color(ray:Ray) -> v3f {
-    let t = hit_sphere(v3f::new(0.0, 0.0, -1.0), 0.5, &ray);
+fn color(ray:Ray) -> Vec3D {
+    let t = hit_sphere(Vec3D::new(0.0, 0.0, -1.0), 0.5, &ray);
 
     if t > 0.0 {
-        let n = (ray.point_at_dist(t) - v3f::new(0.0, 0.0, -1.0)).as_unit();
-        return 0.5 * v3f::new(n.x + 1.0, n.y + 1.0, n.z + 1.0);
+        let n = (ray.point_at_dist(t) - Vec3D::new(0.0, 0.0, -1.0)).as_unit();
+        return 0.5 * Vec3D::new(n.x + 1.0, n.y + 1.0, n.z + 1.0);
     }
 
-    let unit_dir:v3f = ray.direction.as_unit();
+    let unit_dir:Vec3D = ray.direction.as_unit();
     let t:f32 = 0.5 * (unit_dir.y + 1.0);
-    (1.0 - t) * v3f::new(1.0, 1.0, 1.0) + t * v3f::new(0.5, 0.7, 1.0)
+    (1.0 - t) * Vec3D::new(1.0, 1.0, 1.0) + t * Vec3D::new(0.5, 0.7, 1.0)
 }
 
 fn main() {
     let mut img = Image::new(Dimension{x:200, y:100});
 
-    let lower_left_corner = v3f::new(-2.0, -1.0, -1.0);
-    let horizontal = v3f::new(4.0, 0.0, 0.0);
-    let vertical = v3f::new(0.0, 2.0, 0.0);
-    let origin = v3f::new(0.0, 0.0, 0.0);
+    let lower_left_corner = Vec3D::new(-2.0, -1.0, -1.0);
+    let horizontal = Vec3D::new(4.0, 0.0, 0.0);
+    let vertical = Vec3D::new(0.0, 2.0, 0.0);
+    let origin = Vec3D::new(0.0, 0.0, 0.0);
 
     println!("P3");
     println!("{0} {1}", img.dims.x, img.dims.y);
