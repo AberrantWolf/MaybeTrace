@@ -1,5 +1,9 @@
 use std::ops;
 use std::f32;
+use std::rc::Rc;
+
+extern crate rand;
+use rand::random;
 
 #[derive(Copy, Clone)]
 struct Vec3D {x:f32, y:f32, z:f32}
@@ -8,11 +12,11 @@ impl Vec3D {
         Vec3D { x: ix, y: iy, z: iz }
     }
 
-    fn dot(&self, other: Vec3D) -> f32 {
+    fn dot(&self, other: &Vec3D) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
-    fn cross(&self, other: Vec3D) -> Vec3D {
+    fn cross(&self, other: &Vec3D) -> Vec3D {
         Vec3D {
             x: self.y * other.z - self.z * other.y,
             y: -self.x * other.z - self.z * other.x,
@@ -42,6 +46,46 @@ impl Vec3D {
         self.x /= len;
         self.y /= len;
         self.z /= len;
+    }
+}
+
+impl std::ops::AddAssign for Vec3D {
+    fn add_assign(&mut self, other:Vec3D) {
+        *self = Vec3D {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        };
+    }
+}
+
+impl std::ops::SubAssign for Vec3D {
+    fn sub_assign(&mut self, other:Vec3D) {
+        *self = Vec3D {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        };
+    }
+}
+
+impl std::ops::MulAssign<f32> for Vec3D {
+    fn mul_assign(&mut self, other:f32) {
+        *self = Vec3D {
+            x: self.x * other,
+            y: self.y * other,
+            z: self.z * other,
+        };
+    }
+}
+
+impl std::ops::DivAssign<f32> for Vec3D {
+    fn div_assign(&mut self, other:f32) {
+        *self = Vec3D {
+            x: self.x / other,
+            y: self.y / other,
+            z: self.z / other,
+        };
     }
 }
 
@@ -133,6 +177,7 @@ impl ops::Div<Vec3D> for f32 {
     }
 }
 
+#[derive(Copy, Clone)]
 struct Ray {
     origin: Vec3D,
     direction: Vec3D,
@@ -147,6 +192,7 @@ impl Ray {
     }
 }
 
+#[derive(Copy, Clone)]
 struct Dimension {x:usize, y:usize}
 
 struct Image {
@@ -175,41 +221,48 @@ impl Image {
     }
 }
 
-struct HitRecord {
+struct HitRecord<'a> {
     t:f32,
     p:Vec3D,
     normal:Vec3D,
+    material:Option<Rc<Material + 'a>>,
 }
-impl HitRecord {
-    fn new() -> HitRecord {
+impl<'a> HitRecord<'a> {
+    fn new() -> HitRecord<'a> {
         HitRecord {
             t: 0.0,
             p: Vec3D { x: 0.0, y: 0.0, z: 0.0 },
             normal: Vec3D { x: 0.0, y: 0.0, z: 0.0 },
+            material: None,
         }
     }
 }
 
 trait Hitable {
-    fn hit(&self, ray:&Ray, t_min:f32, t_max:f32, hit_record:&mut HitRecord) -> bool;
+    fn hit(&self, ray:&Ray, t_min:f32, t_max:f32) -> Option<HitRecord>;
 }
 
-struct Sphere {
+struct Sphere<> {
     center:Vec3D,
     radius:f32,
+    material:Rc<Material>,
 }
 impl Sphere {
-    fn new(ctr:Vec3D, rad:f32) -> Sphere {
-        Sphere {center:ctr, radius:rad}
+    fn new(ctr:Vec3D, rad:f32, mat:Rc<Material>) -> Sphere {
+        Sphere {
+            center:ctr,
+            radius:rad,
+            material:mat,
+        }
     }
 }
 
 impl Hitable for Sphere {
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, hit_record: &mut HitRecord) -> bool {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let oc = ray.origin - self.center;
-        let a = ray.direction.dot(ray.direction);
-        let b = oc.dot(ray.direction);
-        let c = oc.dot(oc) - self.radius * self.radius;
+        let a = ray.direction.dot(&ray.direction);
+        let b = oc.dot(&ray.direction);
+        let c = oc.dot(&oc) - self.radius * self.radius;
 
         let descriminant = b*b - a*c;
         if descriminant > 0.0 {
@@ -217,19 +270,27 @@ impl Hitable for Sphere {
             let t_pos = (-b + descriminant.sqrt()) / a;
 
             if t_neg < t_max && t_neg > t_min {
-                hit_record.t = t_neg;
-                hit_record.p = ray.point_at_dist(hit_record.t);
-                hit_record.normal = (hit_record.p - self.center) / self.radius;
-                return true
+                let rp = ray.point_at_dist(t_neg);
+                return Some(
+                    HitRecord {
+                        t: t_neg,
+                        p: rp,
+                        normal: (rp - self.center) / self.radius,
+                        material: Some(self.material.clone()),
+                    })
             }
             else if t_pos < t_max && t_pos > t_min {
-                hit_record.t = t_pos;
-                hit_record.p = ray.point_at_dist(hit_record.t);
-                hit_record.normal = (hit_record.p - self.center) / self.radius;
-                return true
+                let rp = ray.point_at_dist(t_pos);
+                return Some(
+                    HitRecord {
+                        t: t_pos,
+                        p: rp,
+                        normal: (rp - self.center) / self.radius,
+                        material: Some(self.material.clone()),
+                    })
             }
         }
-        return false
+        return None
     }
 }
 
@@ -246,16 +307,14 @@ impl HitableList {
 }
 
 impl Hitable for HitableList {
-    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, hit_record: &mut HitRecord) -> bool {
-        let mut hit_anything = false;
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let mut hit_anything: Option<HitRecord> = None;
         let mut closest_so_far = t_max;
 
         for h in &self.list {
-            let mut temp_record = HitRecord::new();
-            if h.hit(ray, t_min, closest_so_far, &mut temp_record) {
-                hit_anything = true;
-                closest_so_far = temp_record.t;
-                *hit_record = temp_record;
+            if let Some(hr) = h.hit(ray, t_min, closest_so_far) {
+                closest_so_far = hr.t;
+                hit_anything = Some(hr);
             }
         }
 
@@ -263,10 +322,83 @@ impl Hitable for HitableList {
     }
 }
 
-fn color(ray:Ray, world:&Hitable) -> Vec3D {
-    let mut rec = HitRecord::new();
-    if world.hit(&ray, 0.0, f32::MAX, &mut rec) {
-        return 0.5 * Vec3D::new(rec.normal.x + 1.0, rec.normal.y + 1.0, rec.normal.z + 1.0);
+struct Camera {
+    origin:Vec3D,
+    lower_left_corner:Vec3D,
+    horizontal:Vec3D,
+    vertical:Vec3D,
+}
+impl Camera {
+    fn new() -> Camera {
+        Camera {
+            origin:Vec3D{x:0.0, y:0.0, z:0.0},
+            lower_left_corner:Vec3D{x:-2.0, y:-1.0, z:-1.0},
+            horizontal:Vec3D{x:4.0, y:0.0, z:0.0},
+            vertical:Vec3D{x:0.0, y:2.0, z:0.0},
+        }
+    }
+
+    fn get_ray(&self, u:f32, v:f32) -> Ray {
+        Ray {origin:self.origin, direction:self.lower_left_corner + u*self.horizontal + v*self.vertical - self.origin}
+    }
+}
+
+fn random_in_unit_sphere() -> Vec3D {
+    let mut p:Vec3D;
+    loop {
+        p = 2.0 * Vec3D::new(random::<f32>(), random::<f32>(), random::<f32>()) - Vec3D::new(1.0, 1.0, 1.0);
+
+        if p.squared_length() < 1.0 { break; }
+    }
+
+    return p;
+}
+
+fn reflect(v:&Vec3D, n:&Vec3D) -> Vec3D {
+    *v - 2.0 * v.dot(n) * *n
+}
+
+trait Material {
+    fn scatter(&self, r_in:&Ray, rec:&HitRecord, attenuation:&mut Vec3D, scattered:&mut Ray) -> bool;
+}
+
+struct LambertianMat {
+    albedo: Vec3D,
+}
+impl Material for LambertianMat {
+    fn scatter(&self, _r_in:&Ray, rec:&HitRecord, attenuation:&mut Vec3D, scattered:&mut Ray) -> bool {
+        let target = rec.p + rec.normal + random_in_unit_sphere();
+        *scattered = Ray { origin: rec.p, direction: target - rec.p };
+        *attenuation = self.albedo;
+        return true;
+    }
+}
+
+struct MetalMat {
+    albedo:Vec3D
+}
+impl Material for MetalMat {
+    fn scatter(&self, r_in:&Ray, rec:&HitRecord, attenuation:&mut Vec3D, scattered:&mut Ray) -> bool {
+        let reflected = reflect(&r_in.direction.as_unit(), &rec.normal);
+        *scattered = Ray { origin: rec.p, direction: reflected };
+        *attenuation = self.albedo;
+        return scattered.direction.dot(&rec.normal) > 0.0;
+    }
+}
+
+fn color(ray:Ray, world:&Hitable, depth:i32) -> Vec3D {
+    if let Some(mut rec) = world.hit(&ray, 0.001, f32::MAX) {
+        let mut scattered: Ray;
+        let mut attenuation = Vec3D {x:0.0, y:0.0, z:0.0};
+
+        let m = rec.material.clone();
+        match m {
+            Some(ref mat) => {
+                if depth < 50 && mat.scatter(&ray, &mut rec, &mut attenuation, &mut scattered) {}
+                return attenuation * color(scattered, world, depth + 1)
+            },
+            None => return Vec3D { x: 0.0, y: 0.0, z: 0.0 },
+        }
     }
 
     let unit_dir:Vec3D = ray.direction.as_unit();
@@ -275,34 +407,44 @@ fn color(ray:Ray, world:&Hitable) -> Vec3D {
 }
 
 fn main() {
-    let mut img = Image::new(Dimension{x:200, y:100});
+    let mut img = Image::new(Dimension { x: 200, y: 100 });
+    let ns: i32 = 100;
 
-    let lower_left_corner = Vec3D::new(-2.0, -1.0, -1.0);
-    let horizontal = Vec3D::new(4.0, 0.0, 0.0);
-    let vertical = Vec3D::new(0.0, 2.0, 0.0);
-    let origin = Vec3D::new(0.0, 0.0, 0.0);
+    let cam = Camera::new();
 
     let mut world = HitableList::new();
-    world.list.push(Box::new(Sphere::new(Vec3D::new(0.0, 0.0, -1.0), 0.5)));
-    world.list.push(Box::new(Sphere::new(Vec3D::new(0.0, -100.5, -1.0), 100.0)));
+    world.list.push(Box::new(Sphere::new(Vec3D::new(0.0, 0.0, -1.0), 0.5, Rc::new(LambertianMat { albedo: Vec3D { x: 0.8, y: 0.3, z: 0.3 } }))));
+    world.list.push(Box::new(Sphere::new(Vec3D::new(0.0, -100.5, -1.0), 100.0, Rc::new(LambertianMat { albedo: Vec3D { x: 0.8, y: 0.8, z: 0.0 } }))));
+
+    // metal spheres
+    world.list.push(Box::new(Sphere::new(Vec3D::new( 1.0, 0.0, -1.0), 0.5, Rc::new(MetalMat { albedo: Vec3D { x: 0.8, y: 0.6, z: 0.2 } }))));
+    world.list.push(Box::new(Sphere::new(Vec3D::new(-1.0, 0.0, -1.0), 0.5, Rc::new(MetalMat { albedo: Vec3D { x: 0.8, y: 0.8, z: 0.8 } }))));
 
     println!("P3");
     println!("{0} {1}", img.dims.x, img.dims.y);
     println!("255");
+
     for y in 0..img.dims.y {
         for x in 0..img.dims.x {
-            let u = x as f32 / img.dims.x as f32;
-            let v = 1f32 - y as f32 / img.dims.y as f32;
+            let mut col = Vec3D { x: 0.0, y: 0.0, z: 0.0 };
+            for _s in 0..ns {
+                let u = (x as f32 + random::<f32>()) / img.dims.x as f32;
+                let v = 1f32 - (y as f32 + random::<f32>()) / img.dims.y as f32;
+                let r = cam.get_ray(u, v);
+//                let p = r.point_at_dist(2.0);
 
-            let r = Ray::new(origin, lower_left_corner + u*horizontal + v*vertical);
-            let c = color(r, &world);
+                col += color(r, &world, 0);
+            }
 
+            col /= ns as f32;
+            // gamma correction
+            let gammaa_col = Vec3D { x: col.x.sqrt(), y: col.y.sqrt(), z: col.z.sqrt() };
             println!("{0} {1} {2}",
-                     (c.x * 255.99) as i32,
-                     (c.y * 255.99) as i32,
-                     (c.z * 255.99) as i32
+                     (gammaa_col.x * 255.99) as i32,
+                     (gammaa_col.y * 255.99) as i32,
+                     (gammaa_col.z * 255.99) as i32
             );
-            &img.data.push(c);
+            &img.data.push(gammaa_col);
         }
     }
 }
