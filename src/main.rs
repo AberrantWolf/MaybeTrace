@@ -402,14 +402,12 @@ fn color(ray:Ray, world:&Hitable, depth:i32) -> Box<Vec3D> {
 
         let mut m = rec.material.clone();
         if let Some(ref mat) = m {
-            if depth < 5 && mat.scatter(&ray, &mut rec, &mut attenuation, &mut scattered) {
-                Box::new(attenuation * *color(scattered, world, depth + 1))
-            } else {
-                Box::new(Vec3D { x: 0.0, y: 0.0, z: 0.0 })
+            if depth < 20 && mat.scatter(&ray, &mut rec, &mut attenuation, &mut scattered) {
+                return Box::new(attenuation * *color(scattered, world, depth + 1))
             }
-        } else {
-            Box::new(Vec3D { x: 0.0, y: 0.0, z: 0.0 })
         }
+
+        Box::new(Vec3D { x: 0.0, y: 0.0, z: 0.0 })
     } else {
         let unit_dir: Vec3D = ray.direction.as_unit();
         let t: f32 = 0.5 * (unit_dir.y + 1.0);
@@ -418,8 +416,8 @@ fn color(ray:Ray, world:&Hitable, depth:i32) -> Box<Vec3D> {
 }
 
 fn main() {
-    let mut img = Image::new(Dimension { x: 200, y: 100 });
-    let ns: i32 = 100;
+    let mut img = Image::new(Dimension { x: 800, y: 400 });
+    let ns: i32 = 40;
 
     let cam = Camera::new();
 
